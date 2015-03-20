@@ -69,7 +69,9 @@ func Run(mux *web.Mux, mungeRequest func(*http.Request)) error {
 			return fmt.Errorf("error writing actual_response %q: %v", test, err)
 		}
 
-		verify(test, repBytes)
+		if err := verify(test, repBytes); err != nil {
+			return err
+		}
 	}
 
 	return nil
