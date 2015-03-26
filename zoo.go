@@ -1,3 +1,6 @@
+// Package zoo provides a series utilities to run tests against a Goji web server.
+// The Goji source is available at https://github.com/zenazn/goji, and its godocs
+// are available at https://godoc.org/github.com/zenazn/goji
 package zoo
 
 import (
@@ -12,6 +15,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/zenazn/goji/web"
 )
@@ -22,29 +27,51 @@ const (
 	actualRepFn   = "actual_response"
 )
 
+// MatchMode describes the different ways Zoo supports verifying matches.
+type MatchMode int
+
+const (
+	// Exact refers to a verbatim match of response bodies.
+	Exact MatchMode = iota
+
+	// Regexp refers to a regexp-compiled match of response bodies.
+	Regexp
+)
+
 // Path can be set to the directory
 var Path = "zoo"
 
-// Run is the main method for zoo tests: it takes a testing.T, a gojimux,
-// and a func that is called on every request.
-func Run(mux *web.Mux, mungeRequest func(*http.Request)) error {
+// Config describes a zoo-directory-level description of config.
+type Config struct {
+	MatchMode
+	MungeRequest func(*http.Request)
+}
+
+// Run is the main method for zoo tests: it takes a gojimux,
+// and a map of test name (i.e. the directory in the zoo dir).
+func Run(mux *web.Mux, config map[string]Config) error {
 	tests, err := getTests()
 	if err != nil {
 		return fmt.Errorf("%+v", err)
 	}
 
 	for _, test := range tests {
+		verificationMode := Exact
+
 		in, err := os.Open(path.Join(test, requestFn))
 		if err != nil {
 			return fmt.Errorf("error opening input %q: %v", test, err)
-			continue
 		}
 		req, err := http.ReadRequest(bufio.NewReader(in))
 		if err != nil {
 			return fmt.Errorf("error parsing request for %q: %v", test, err)
-			continue
 		}
-		mungeRequest(req)
+
+		conf, confExists := config[filepath.Base(test)]
+		if confExists {
+			conf.MungeRequest(req)
+			verificationMode = conf.MatchMode
+		}
 
 		rep := httptest.NewRecorder()
 		mux.ServeHTTP(rep, req)
@@ -69,7 +96,7 @@ func Run(mux *web.Mux, mungeRequest func(*http.Request)) error {
 			return fmt.Errorf("error writing actual_response %q: %v", test, err)
 		}
 
-		if err := verify(test, repBytes); err != nil {
+		if err := verify(test, repBytes, verificationMode); err != nil {
 			return err
 		}
 	}
@@ -96,14 +123,36 @@ func getTests() ([]string, error) {
 	return dirs, nil
 }
 
-func verify(test string, actual []byte) error {
+func normalize(buf []byte) []byte {
+	return []byte(strings.TrimSpace(string(buf)))
+}
+
+func verify(test string, actual []byte, verificationMode MatchMode) error {
 	expected, err := ioutil.ReadFile(path.Join(test, expectedRepFn))
 	if err != nil {
 		return err
 	}
+	normalizedExpected := normalize(expected)
+	normalizedActual := normalize(actual)
 
-	if bytes.Compare(expected, actual) != 0 {
-		return fmt.Errorf("responses for %q don't match", test)
+	errNoMatch := fmt.Errorf("responses for %q don't match", test)
+
+	switch verificationMode {
+	case Exact:
+		if bytes.Compare(normalizedExpected, normalizedActual) != 0 {
+			return errNoMatch
+		}
+	case Regexp:
+		matched, err := regexp.Match(string(normalizedExpected), normalizedActual)
+		if err != nil {
+			return err
+		}
+
+		if !matched {
+			return errNoMatch
+		}
+	default:
+		return fmt.Errorf("unknown verificationMode: %+v", verificationMode)
 	}
 
 	return nil
