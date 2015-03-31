@@ -3,20 +3,29 @@ package zoo
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
 	"os"
 	"path/filepath"
 
+	"github.com/mgutz/ansi"
 	"github.com/zenazn/goji/web"
 )
 
-func Record(mux *web.Mux, tests map[string]*http.Request) error {
-	for testName, req := range tests {
-		log.Printf("generating request and expected response for test: %q", testName)
-		reqBytes, err := httputil.DumpRequest(req, true)
+type Request struct {
+	Name               string
+	Req                *http.Request
+	MungeResponseBytes func([]byte) []byte
+}
+
+func Record(mux *web.Mux, requests []*Request) error {
+	for _, test := range requests {
+		req := test.Req
+		testName := test.Name
+
+		zoolog(fmt.Sprintf("[zoo] [%s] generating request and expected response for test", testName))
+		reqBytes, err := httputil.DumpRequestOut(req, true)
 		if err != nil {
 			return err
 		}
@@ -42,7 +51,7 @@ func Record(mux *web.Mux, tests map[string]*http.Request) error {
 		testDir := filepath.Join(absPath, testName)
 
 		if fi, err := os.Stat(testDir); err != nil {
-			log.Printf("creating dir: %q", testDir)
+			zoolog(fmt.Sprintf("[zoo] [%s] creating dir: %q", testName, testDir))
 			if err := os.Mkdir(testDir, 0755); err != nil {
 				return err
 			}
@@ -51,19 +60,29 @@ func Record(mux *web.Mux, tests map[string]*http.Request) error {
 		}
 
 		requestPath := filepath.Join(testDir, requestFn)
-		log.Printf("writing request out to %q", requestPath)
+		zoolog(fmt.Sprintf("[zoo] [%s] writing request out to %q", testName, requestPath))
 
 		if err := ioutil.WriteFile(requestPath, reqBytes, 0644); err != nil {
 			return err
 		}
 
+		if test.MungeResponseBytes != nil {
+			zoolog(fmt.Sprintf("[zoo] [%s] munging response bytes", testName))
+			repBytes = test.MungeResponseBytes(repBytes)
+		}
+
 		expectedResponsePath := filepath.Join(testDir, expectedRepFn)
-		log.Printf("writing expected_response out to %q", expectedResponsePath)
+		zoolog(fmt.Sprintf("[zoo] [%s] writing expected_response out to %q", testName, expectedResponsePath))
 		if err := ioutil.WriteFile(expectedResponsePath, repBytes, 0644); err != nil {
 			return err
 		}
 	}
 
-	log.Printf("all done")
+	zoolog(fmt.Sprintf("[zoo] all done"))
 	return nil
+}
+
+func zoolog(msg string) {
+	phosphorize := ansi.ColorFunc("green+h:black")
+	fmt.Println(phosphorize(msg))
 }

@@ -18,22 +18,37 @@ import (
 	"github.com/zenazn/goji/web"
 )
 
-// Config describes a zoo-directory-level description of config.
+// Config describes the global zoo config. These can be overridden
+// on a per-test-level in TestConf.
 type Config struct {
+	MatchMode
+	MungeRequest func(*http.Request)
+	TestConf     map[string]TestConfig
+}
+
+// TestConfig describes a zoo-directory-level description of config.
+type TestConfig struct {
 	MatchMode
 	MungeRequest func(*http.Request)
 }
 
 // Run is the main method for zoo tests: it takes a gojimux,
 // and a map of test name (i.e. the directory in the zoo dir).
-func Run(mux *web.Mux, config map[string]Config) error {
+func Run(mux *web.Mux, config Config) error {
 	tests, err := getTests()
 	if err != nil {
 		return fmt.Errorf("%+v", err)
 	}
 
 	for _, test := range tests {
-		verificationMode := Exact
+		mungeRequest := config.MungeRequest
+		verificationMode := config.MatchMode
+
+		conf, confExists := config.TestConf[filepath.Base(test)]
+		if confExists {
+			mungeRequest = conf.MungeRequest
+			verificationMode = conf.MatchMode
+		}
 
 		in, err := os.Open(path.Join(test, requestFn))
 		if err != nil {
@@ -43,11 +58,9 @@ func Run(mux *web.Mux, config map[string]Config) error {
 		if err != nil {
 			return fmt.Errorf("error parsing request for %q: %v", test, err)
 		}
-
-		conf, confExists := config[filepath.Base(test)]
-		if confExists {
-			conf.MungeRequest(req)
-			verificationMode = conf.MatchMode
+		if mungeRequest != nil {
+			log.Printf("munging request")
+			mungeRequest(req)
 		}
 
 		rep := httptest.NewRecorder()
@@ -112,6 +125,7 @@ func verify(test string, actual []byte, verificationMode MatchMode) error {
 	normalizedExpected := normalize(expected)
 	normalizedActual := normalize(actual)
 
+	fmt.Printf("Test %q running in mode %+v", test, verificationMode)
 	errNoMatch := fmt.Errorf("responses for %q don't match", test)
 
 	switch verificationMode {

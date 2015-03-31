@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"net/url"
+	"regexp"
 	"testing"
 	"time"
 
@@ -31,11 +31,15 @@ func initGoji() {
 }
 
 func TestZoo(t *testing.T) {
-	config := map[string]Config{
-		"regexp": Config{
-			MatchMode:    Regexp,
-			MungeRequest: func(req *http.Request) {},
-		},
+	testConf := map[string]TestConfig{
+		"regexp":      TestConfig{Regexp, nil},
+		"test_record": TestConfig{Regexp, nil},
+	}
+
+	config := Config{
+		MatchMode:    Exact,
+		MungeRequest: func(req *http.Request) {},
+		TestConf:     testConf,
 	}
 	err := Run(mux, config)
 	if err != nil {
@@ -44,18 +48,31 @@ func TestZoo(t *testing.T) {
 }
 
 func TestRecord(t *testing.T) {
-	uri, _ := url.Parse("/hello/siddarth")
-
-	tests := map[string]*http.Request{
-		"test_record": &http.Request{
-			Header: map[string][]string{
-				"Test-Header": []string{"Test value 1", "Test Value 2"},
+	req, err := http.NewRequest("GET", "http://localhost/random", nil)
+	if err != nil {
+		t.Fatalf("%+v", err)
+	}
+	tests := []*Request{
+		&Request{
+			Name: "test_record",
+			Req:  req,
+			MungeResponseBytes: func(in []byte) []byte {
+				pattern := "rand_\\w+"
+				reg := regexp.MustCompile(pattern)
+				return []byte(reg.ReplaceAllString(string(in), pattern))
 			},
-			Method: "GET",
-			URL:    uri,
 		},
 	}
-	Record(mux, tests)
+	if err := Record(mux, tests); err != nil {
+		t.Fatalf("%+v", err)
+	}
+
+	if err := Run(mux, Config{
+		MatchMode:    Regexp,
+		MungeRequest: func(req *http.Request) {},
+	}); err != nil {
+		t.Fatalf("%+v", err)
+	}
 }
 
 // h/t: http://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-golang

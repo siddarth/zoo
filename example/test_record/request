@@ -1,4 +1,5 @@
-GET /hello/siddarth HTTP/0.0
-Test-Header: Test value 1
-Test-Header: Test Value 2
+GET /random HTTP/1.1
+Host: localhost
+User-Agent: Go 1.1 package http
+Accept-Encoding: gzip
 
