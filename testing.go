@@ -105,7 +105,7 @@ func getTests() ([]string, error) {
 
 	for _, fi := range fis {
 		if !fi.IsDir() {
-			return nil, fmt.Errorf("unexpected non-dir file in zoo path: %s", fi.Name())
+			continue
 		}
 		dirs = append(dirs, filepath.Join(absPath, fi.Name()))
 	}
