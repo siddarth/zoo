@@ -1,4 +1,4 @@
-package zoo
+dpackage zoo
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 	"github.com/zenazn/goji/web"
 )
 
-func ZooRecord(mux *web.Mux, tests map[string]*http.Request) error {
+func Record(mux *web.Mux, tests map[string]*http.Request) error {
 	for testName, req := range tests {
 		log.Printf("generating request and expected response for test: %q", testName)
 		reqBytes, err := httputil.DumpRequest(req, true)
