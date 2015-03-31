@@ -13,6 +13,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/zenazn/goji/web"
@@ -110,6 +111,7 @@ func getTests() ([]string, error) {
 		dirs = append(dirs, filepath.Join(absPath, fi.Name()))
 	}
 
+	sort.Strings(dirs)
 	return dirs, nil
 }
 
