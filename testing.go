@@ -127,7 +127,6 @@ func verify(test string, actual []byte, verificationMode MatchMode) error {
 	normalizedExpected := normalize(expected)
 	normalizedActual := normalize(actual)
 
-	fmt.Printf("Test %q running in mode %+v", test, verificationMode)
 	errNoMatch := fmt.Errorf("responses for %q don't match", test)
 
 	switch verificationMode {
