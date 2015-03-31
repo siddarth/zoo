@@ -1,4 +1,4 @@
-dpackage zoo
+package zoo
 
 import (
 	"fmt"

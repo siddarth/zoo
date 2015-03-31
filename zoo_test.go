@@ -55,7 +55,7 @@ func TestRecord(t *testing.T) {
 			URL:    uri,
 		},
 	}
-	ZooRecord(mux, tests)
+	Record(mux, tests)
 }
 
 // h/t: http://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-golang
