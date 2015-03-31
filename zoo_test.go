@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
 
@@ -40,6 +41,21 @@ func TestZoo(t *testing.T) {
 	if err != nil {
 		t.Errorf("%+v", err)
 	}
+}
+
+func TestRecord(t *testing.T) {
+	uri, _ := url.Parse("/hello/siddarth")
+
+	tests := map[string]*http.Request{
+		"test_record": &http.Request{
+			Header: map[string][]string{
+				"Test-Header": []string{"Test value 1", "Test Value 2"},
+			},
+			Method: "GET",
+			URL:    uri,
+		},
+	}
+	ZooRecord(mux, tests)
 }
 
 // h/t: http://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-golang
